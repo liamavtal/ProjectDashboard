@@ -15,6 +15,9 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Serve static frontend in production
+app.use(express.static(path.join(__dirname, 'dist')));
+
 // Data files
 const DATA_DIR = path.join(__dirname, 'data');
 const PROJECTS_FILE = path.join(DATA_DIR, 'projects.json');
@@ -31,11 +34,10 @@ const ICLOUD_CREDS_FILE = path.join(DATA_DIR, 'icloud-credentials.json');
 // Ensure data directory exists
 await fs.mkdir(DATA_DIR, { recursive: true });
 
-// Directories to scan
-const SCAN_DIRS = [
-  'C:\\Users\\liam1\\Desktop',
-  'C:\\Users\\liam1'
-];
+// Directories to scan (use env var for production)
+const SCAN_DIRS = process.env.SCAN_DIRS
+  ? process.env.SCAN_DIRS.split(',')
+  : ['C:\\Users\\liam1\\Desktop', 'C:\\Users\\liam1'];
 
 // ============================================================================
 // DATA HELPERS
@@ -1529,10 +1531,18 @@ app.get('/api/search', async (req, res) => {
 });
 
 // ============================================================================
+// CATCH-ALL FOR SPA ROUTING
+// ============================================================================
+
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+});
+
+// ============================================================================
 // START SERVER
 // ============================================================================
 
-const PORT = 3847;
+const PORT = process.env.PORT || 3847;
 app.listen(PORT, () => {
   console.log(`
   ╔═══════════════════════════════════════════════════════════╗
