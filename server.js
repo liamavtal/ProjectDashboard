@@ -1531,9 +1531,13 @@ app.get('/api/search', async (req, res) => {
 });
 
 // ============================================================================
-// CATCH-ALL FOR SPA ROUTING
+// SERVE STATIC FILES & SPA ROUTING (Production)
 // ============================================================================
 
+// Serve static files from the built frontend
+app.use(express.static(path.join(__dirname, 'dist')));
+
+// Catch-all for SPA routing
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
