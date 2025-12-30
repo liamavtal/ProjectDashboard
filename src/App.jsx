@@ -91,14 +91,15 @@ export default function App() {
 
   const loadGitHub = useCallback(async () => {
     try {
+      const safeArray = (data) => Array.isArray(data) ? data : [];
       const [user, repos, issues, prs, notifications] = await Promise.all([
         fetch(`${API}/github/user`).then(r => r.json()).catch(() => null),
-        fetch(`${API}/github/repos`).then(r => r.json()).catch(() => []),
-        fetch(`${API}/github/issues`).then(r => r.json()).catch(() => []),
-        fetch(`${API}/github/prs`).then(r => r.json()).catch(() => []),
-        fetch(`${API}/github/notifications`).then(r => r.json()).catch(() => [])
+        fetch(`${API}/github/repos`).then(r => r.json()).then(safeArray).catch(() => []),
+        fetch(`${API}/github/issues`).then(r => r.json()).then(safeArray).catch(() => []),
+        fetch(`${API}/github/prs`).then(r => r.json()).then(safeArray).catch(() => []),
+        fetch(`${API}/github/notifications`).then(r => r.json()).then(safeArray).catch(() => [])
       ]);
-      setGhUser(user);
+      setGhUser(user?.login ? user : null);
       setGhRepos(repos);
       setGhIssues(issues);
       setGhPRs(prs);

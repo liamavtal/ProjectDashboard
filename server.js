@@ -1263,9 +1263,21 @@ app.get('/api/finances', async (req, res) => {
       subscriptions: [],
       income: [],
       expenses: [],
+      transactions: [],
       settings: { currency: 'USD' }
     });
-    res.json(finances);
+    // Combine income and expenses into transactions for frontend compatibility
+    const allTransactions = [
+      ...(finances.transactions || []),
+      ...(finances.income || []).map(t => ({ ...t, type: 'income' })),
+      ...(finances.expenses || []).map(t => ({ ...t, type: 'expense' }))
+    ].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    res.json({
+      subscriptions: finances.subscriptions || [],
+      transactions: allTransactions,
+      summary: finances.summary || {}
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1304,22 +1316,20 @@ app.delete('/api/finances/subscriptions/:id', async (req, res) => {
 
 app.post('/api/finances/transactions', async (req, res) => {
   try {
-    const finances = await loadJSON(FINANCES_FILE, { subscriptions: [], income: [], expenses: [] });
+    const finances = await loadJSON(FINANCES_FILE, { subscriptions: [], transactions: [] });
     const transaction = {
       id: Date.now().toString(),
-      type: req.body.type, // income or expense
-      amount: req.body.amount,
+      type: req.body.type || 'expense',
+      amount: parseFloat(req.body.amount) || 0,
       description: req.body.description,
       category: req.body.category,
       date: req.body.date || new Date().toISOString(),
-      projectId: req.body.projectId
+      projectId: req.body.projectId,
+      createdAt: new Date().toISOString()
     };
 
-    if (transaction.type === 'income') {
-      finances.income.push(transaction);
-    } else {
-      finances.expenses.push(transaction);
-    }
+    if (!finances.transactions) finances.transactions = [];
+    finances.transactions.unshift(transaction);
 
     await saveJSON(FINANCES_FILE, finances);
     res.json(transaction);
@@ -1344,12 +1354,24 @@ app.get('/api/automations', async (req, res) => {
 app.post('/api/automations', async (req, res) => {
   try {
     const automations = await loadJSON(AUTOMATIONS_FILE, []);
+
+    // Handle both frontend format (trigger/triggerConfig/action/actionConfig)
+    // and structured format (trigger object / actions array)
+    const trigger = typeof req.body.trigger === 'string'
+      ? { type: req.body.trigger, config: req.body.triggerConfig || {} }
+      : req.body.trigger;
+
+    const actions = req.body.actions || [{
+      type: req.body.action || 'notification',
+      config: req.body.actionConfig || {}
+    }];
+
     const automation = {
       id: Date.now().toString(),
       name: req.body.name,
-      trigger: req.body.trigger, // { type: 'schedule' | 'webhook' | 'event', config: {} }
-      actions: req.body.actions, // [{ type: 'notification' | 'script' | 'api', config: {} }]
-      enabled: true,
+      trigger,
+      actions,
+      enabled: req.body.enabled !== false,
       createdAt: new Date().toISOString(),
       lastRun: null
     };
