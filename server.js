@@ -1345,7 +1345,15 @@ app.post('/api/finances/transactions', async (req, res) => {
 app.get('/api/automations', async (req, res) => {
   try {
     const automations = await loadJSON(AUTOMATIONS_FILE, []);
-    res.json(automations);
+    // Add display-friendly trigger/action strings for frontend compatibility
+    const enriched = automations.map(a => ({
+      ...a,
+      trigger: typeof a.trigger === 'object' ? a.trigger.type : a.trigger,
+      action: Array.isArray(a.actions) && a.actions[0] ? a.actions[0].type : (a.action || 'notification'),
+      triggerConfig: typeof a.trigger === 'object' ? a.trigger.config : {},
+      actionConfig: Array.isArray(a.actions) && a.actions[0] ? a.actions[0].config : {}
+    }));
+    res.json(enriched);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
