@@ -670,6 +670,22 @@ function ProjectsView({ projects, onRefresh }) {
   const [selected, setSelected] = useState(null);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
+  const [showNewProject, setShowNewProject] = useState(false);
+  const [newProject, setNewProject] = useState({ name: '', description: '' });
+
+  const createProject = async () => {
+    if (!newProject.name.trim()) return;
+    try {
+      await fetch(`${API}/api/projects`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newProject)
+      });
+      setShowNewProject(false);
+      setNewProject({ name: '', description: '' });
+      onRefresh();
+    } catch (e) { console.error(e); }
+  };
 
   const filtered = projects.filter(p => {
     if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false;
@@ -718,7 +734,53 @@ function ProjectsView({ projects, onRefresh }) {
               <CheckCircle className="w-3 h-3" /> Clean ({stats.total - stats.dirty})
             </button>
           </div>
+          <button
+            onClick={() => setShowNewProject(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-500 transition-colors"
+          >
+            <Plus className="w-4 h-4" /> New Project
+          </button>
         </div>
+
+        {/* New Project Modal */}
+        {showNewProject && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowNewProject(false)}>
+            <div className="bg-zinc-900 rounded-xl p-6 w-full max-w-md border border-zinc-800" onClick={e => e.stopPropagation()}>
+              <h2 className="text-xl font-semibold mb-4">New Project</h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm text-zinc-400 mb-1">Project Name</label>
+                  <input
+                    type="text"
+                    value={newProject.name}
+                    onChange={e => setNewProject({ ...newProject, name: e.target.value })}
+                    placeholder="My Awesome Project"
+                    className="w-full px-3 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-white focus:outline-none focus:border-indigo-500"
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-zinc-400 mb-1">Description (optional)</label>
+                  <textarea
+                    value={newProject.description}
+                    onChange={e => setNewProject({ ...newProject, description: e.target.value })}
+                    placeholder="Brief description of the project..."
+                    rows={3}
+                    className="w-full px-3 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-white focus:outline-none focus:border-indigo-500 resize-none"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-3 mt-6">
+                <button onClick={() => setShowNewProject(false)} className="flex-1 px-4 py-2 rounded-lg bg-zinc-800 text-white hover:bg-zinc-700">
+                  Cancel
+                </button>
+                <button onClick={createProject} className="flex-1 px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-500">
+                  Create Project
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Project List */}
         <div className="flex-1 overflow-auto p-4">

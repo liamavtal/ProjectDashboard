@@ -217,7 +217,7 @@ async function scanProjects() {
 
 app.get('/api/projects', async (req, res) => {
   try {
-    const [projects, data] = await Promise.all([scanProjects(), loadJSON(PROJECTS_FILE)]);
+    const [projects, data] = await Promise.all([scanProjects(), loadJSON(PROJECTS_FILE, { projects: {}, pinned: [], manualProjects: [] })]);
 
     const enriched = projects.map(p => ({
       ...p,
@@ -226,13 +226,21 @@ app.get('/api/projects', async (req, res) => {
       status: data.projects?.[p.id]?.status || 'active'
     }));
 
-    enriched.sort((a, b) => {
+    // Include manual projects
+    const manualProjects = (data.manualProjects || []).map(p => ({
+      ...p,
+      pinned: data.pinned?.includes(p.id)
+    }));
+
+    const allProjects = [...enriched, ...manualProjects];
+
+    allProjects.sort((a, b) => {
       if (a.pinned && !b.pinned) return -1;
       if (!a.pinned && b.pinned) return 1;
       return new Date(b.modified) - new Date(a.modified);
     });
 
-    res.json(enriched);
+    res.json(allProjects);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -266,6 +274,53 @@ app.patch('/api/projects/:id', async (req, res) => {
       } else if (!pinned) {
         data.pinned = data.pinned.filter(id => id !== req.params.id);
       }
+    }
+
+    await saveJSON(PROJECTS_FILE, data);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Create a new manual project
+app.post('/api/projects', async (req, res) => {
+  try {
+    const data = await loadJSON(PROJECTS_FILE, { projects: {}, pinned: [], manualProjects: [] });
+
+    const project = {
+      id: Date.now().toString(),
+      name: req.body.name || 'Untitled Project',
+      description: req.body.description || '',
+      status: req.body.status || 'active',
+      color: req.body.color || '#6366f1',
+      createdAt: new Date().toISOString(),
+      modified: new Date().toISOString(),
+      isManual: true
+    };
+
+    if (!data.manualProjects) data.manualProjects = [];
+    data.manualProjects.push(project);
+
+    await saveJSON(PROJECTS_FILE, data);
+    res.json(project);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Delete a manual project
+app.delete('/api/projects/:id', async (req, res) => {
+  try {
+    const data = await loadJSON(PROJECTS_FILE, { projects: {}, pinned: [], manualProjects: [] });
+
+    if (data.manualProjects) {
+      data.manualProjects = data.manualProjects.filter(p => p.id !== req.params.id);
+    }
+
+    // Also remove from pinned if present
+    if (data.pinned) {
+      data.pinned = data.pinned.filter(id => id !== req.params.id);
     }
 
     await saveJSON(PROJECTS_FILE, data);
